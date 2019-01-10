@@ -1,0 +1,7 @@
+{
+    "env": {
+        "MONGO_USER": "ET",
+        "MONGO_PASSWORD": "LZPMbZAXRJ00mPjB",
+        "MONGO_DB": "graph-ql-booking"
+    }
+}
