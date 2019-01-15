@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const graphqlHttp = require('express-graphql');
-const {buildSchema} = require('graphql');
+const { buildSchema } = require('graphql');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -12,6 +12,24 @@ const app = express();
 
 app.use(bodyParser.json());
 
+const events = eventIds => {
+    return Event.find({_id: {$in:eventIds}}).then(events => {
+        return events.map(event => {
+            return {...event._doc, _id: event.id, creator: user.bind(this, event.creator)}
+        })
+    }).catch(err => {
+        throw err;
+    })
+}
+
+const user = userId => {
+    return User.findById(userId).then(user => {
+        return {...user._doc, _id: user.id, createEvents: events.bind(this, user._doc.createdEvents)};
+    }).catch(err => {
+        throw err;
+    })
+}
+
 app.use('/api', graphqlHttp({
     schema: buildSchema(`
     type Event {
@@ -20,12 +38,14 @@ app.use('/api', graphqlHttp({
         description: String!
         price: Float!
         date: String!
+        creator: User!
     }
 
     type User {
         _id: ID!
         email: String!
         password: String
+        createdEvents: [Event!]
     }
 
     input EventInput {
@@ -58,7 +78,11 @@ app.use('/api', graphqlHttp({
         events: () => {
             return Event.find().then(events => {
                 return events.map(event => {
-                    return {...event._doc, _id: event._doc._id.toString()}
+                    return { 
+                        ...event._doc, 
+                        _id: event._id,
+                        creator: user.bind(this, event._doc.creator)
+                    }
                 })
             }).catch(err => {
                 throw err;
@@ -74,11 +98,10 @@ app.use('/api', graphqlHttp({
             });
             let createdEvent;
             return event.save().then(res => {
-                createdEvent = {...result.doc, _id: result._doc._id.toString()}
+                createdEvent = { ...result.doc, _id: result._doc._id.toString(), creator: user.bind(this, result._doc.creator) }
                 return User.findById('1')
-                console.log(res);
             }).then(user => {
-                if(!user) {
+                if (!user) {
                     throw new Error('User Not Found.')
                 }
                 user.createdEvents.push(event);
@@ -86,14 +109,14 @@ app.use('/api', graphqlHttp({
             }).then(res => {
                 return createdEvent;
             })
-            .catch(err => {
-                console.log(err);
-                throw err;
-            });
+                .catch(err => {
+                    console.log(err);
+                    throw err;
+                });
         },
         createUser: args => {
-            return User.findOne({email: args.userInput.email}).then(user => {
-                if(user) {
+            return User.findOne({ email: args.userInput.email }).then(user => {
+                if (user) {
                     throw new Error('User exists.')
                 }
                 return bcrypt.hash(args.userInput.password, 12)
@@ -102,14 +125,14 @@ app.use('/api', graphqlHttp({
                     email: args.userInput.email,
                     password: hashedPassword
                 });
-                    return user.save();
-                }).then(res => {
-                    return {...result._doc, password: null, _id: res.id};
-                })
+                return user.save();
+            }).then(res => {
+                return { ...result._doc, password: null, _id: res.id };
+            })
                 .catch(err => {
                     throw err
                 }
-            )
+                )
         }
     },
     graphiql: true
